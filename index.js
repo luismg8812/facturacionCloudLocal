@@ -1,4 +1,6 @@
 const express = require('express');
+const printer =require('pdf-to-printer');
+var pdf = require('html-pdf');
 var SerialPort = require('serialport');
 const path = require('path')
 const app = express();
@@ -8,7 +10,21 @@ var cors = require('cors');
 var fs = require('fs');
 
 var document;
-//var info = fs.readFileSync("C:/facturas/factura_41.pdf");
+//var info = fs.readFileSync("C:/facturas/CONTRATO DE TRABAJO.pdf");
+
+function peso(kg){
+  const content = 'peso: '+kg;
+
+fs.writeFile('C:/facturas/peso.txt', content, err => {
+  if (err) {
+    console.error(err);
+  }
+  console.log("funcion peso: "+kg)
+});
+}
+
+
+
 
 function sendPrint() {
   /*printer.printDirect({
@@ -60,10 +76,46 @@ io.on('connection', (socket) => {
     getdata(data);
   });
   socket.on('printer', (filename) => {
-   // setTimeout(printered(filename), 3000);
-
+    console.log(filename);
+    if(filename.includes(".pdf")){
+      imprimirPDF(filename)
+    }else{
+      imprimirTXT(filename);
+    }
+    
+    
   });
 });
+
+ function imprimirTXT(filename){
+  let rutaArchivo="C:/facturas/";
+  //var info = fs.readFileSync('ticket.txt').toString();
+  fs.readFile("C:/facturas/FACTURA DE VENTA._10_2__1_1.txt", function (err1, data) {
+    if (err1) {
+      console.log(err1);
+      throw err1;
+    };
+    console.log(data);
+    pdf.create(data.toString()).toFile(rutaArchivo+'salida.pdf', function(err, res) {
+      if (err){
+          console.log(err);
+      } else {
+          console.log(res);
+          setTimeout(imprimirPDF(rutaArchivo+'salida.pdf'), 2000);
+      }
+  });
+  
+  });
+  console.log("aqui llega");
+}
+
+function imprimirPDF(filename){
+  console.log(filename);
+  console.log("C:/facturas/"+filename);
+  printer.print("C:/facturas/"+filename)
+  .then(console.log("documento impreso "+filename))
+  .catch(console.error);
+}
 
 function printered(filename) {
   console.log(filename);
@@ -94,16 +146,20 @@ function getdata(gramera) {
 
         var acum = '';
         var data = "";
+        if(Number(gramera)==3){
+          console.log("gramera3:"+gramera);
+          port.write('P');
+        }
         port.on('readable', function () {
 
-          acum = acum + port.read().toString();
+          acum = acum + port.read(); 
          // console.log(acum);
           switch (Number(gramera)) {
             case 0:
               console.log("gramera 0");
               break;
             case 1:
-              console.log("gramera 1");
+             // console.log("gramera 1");
               if (acum.includes('+') && acum.includes('Kg')) {
                 data = acum.replace(/\r?\n|\r/g, '');
                 data = data.replace(/ /g, '');
@@ -122,6 +178,20 @@ function getdata(gramera) {
                 if (!isNaN(data)) {
                   console.log("es numerico");
                   io.sockets.emit('gramera', data)
+                  fs.writeFile("C:/facturacion/peso.txt", data+"\n", function(err) {
+                    if(err) {
+                        return console.log(err);
+                    }
+                    console.log("The file was saved!");
+                }); 
+               /* fs.readFile("C:/facturacion/peso.txt", function (err1, data) {
+                  if (err1) {
+                    console.log(err1);
+                    throw err1;
+                  };
+                  console.log(data.toString());
+                
+                });*/
                 }
               }
               break;
@@ -147,6 +217,37 @@ function getdata(gramera) {
                 }
               }
               break;
+              case 3:
+                if(!acum.includes('.')){
+                  acum = acum + port.read(); 
+              
+                }else{
+                      port.close(function () {
+                    console.log('port closed');
+                });
+                }
+                console.log("gramera 3");
+                  data = acum.replace(/\r?\n|\r/g, '');
+                  data = data.replace(/ /g, '');
+                  data = data.replace("Ut:       0", '');
+                  data = data.replace("Tt:       0", '');
+                  data = data.replace(/[a-z]/g, '');
+                  data = data.replace(/[A-Z]/g, '');
+                  data = data.replace(/:/g, '');
+                  data = data.replace(/,/g, '');
+                  data = data.replace("+", '');
+  
+                  console.log('Data:', data)
+                  console.log("completo");
+                  console.log("acum:", acum);
+                  acum = "";
+                  if (!isNaN(data)) {
+                    console.log("es numerico");
+                    io.sockets.emit('gramera', data)
+                  
+                  }
+                
+                break;
             default:
             // code block
           }
